@@ -39,8 +39,27 @@ function PreviewComponent({ component }) {
   const renderComponent = () => {
     const { type, props, style } = component
     const className = getClassNames(style)
-    
+
     switch (type) {
+      case 'Website':
+        return (
+          <div className="w-full h-full bg-white rounded-lg shadow-lg overflow-hidden">
+            <div className="bg-gray-100 px-4 py-2 border-b flex items-center gap-2">
+              <div className="flex gap-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              </div>
+              <div className="text-sm text-gray-600 font-medium ml-4">Generated Website</div>
+            </div>
+            <iframe
+              srcDoc={props.html}
+              className="w-full h-[600px] border-0"
+              sandbox="allow-scripts allow-same-origin"
+              title="Generated Website Preview"
+            />
+          </div>
+        )
       case 'Button':
         return (
           <button className={`${className} px-4 py-2 font-medium transition-colors hover:opacity-90 cursor-pointer`}>
@@ -116,6 +135,15 @@ function PreviewComponent({ component }) {
           </div>
         )
     }
+  }
+
+  // For Website components, render differently (full screen)
+  if (component.type === 'Website') {
+    return (
+      <div className="w-full h-full p-4">
+        {renderComponent()}
+      </div>
+    )
   }
 
   return (

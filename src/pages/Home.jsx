@@ -93,20 +93,32 @@ function Home() {
 
         {/* CTA */}
         <div className="text-center mb-12 sm:mb-20 relative z-10 px-4">
-          <div className="relative inline-block">
-            <div className="absolute inset-0 bg-gradient-ai rounded-2xl blur-lg opacity-50 animate-glow"></div>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-ai rounded-2xl blur-lg opacity-50 animate-glow"></div>
+              <Link
+                to="/signup"
+                className="relative btn-primary inline-flex items-center gap-3 text-white px-8 sm:px-12 py-4 sm:py-6 rounded-2xl text-lg sm:text-xl font-bold shadow-premium hover:shadow-glow-lg transform hover:scale-105 transition-all duration-300"
+              >
+                <Sparkles size={24} className="animate-pulse" />
+                <span className="hidden sm:inline">Start Building with AI</span>
+                <span className="sm:hidden">Start Building</span>
+                <ArrowRight size={20} />
+              </Link>
+            </div>
+
+            <div className="text-gray-600 dark:text-gray-400 font-medium">or</div>
+
             <Link
-              to="/editor"
-              className="relative btn-primary inline-flex items-center gap-3 text-white px-8 sm:px-12 py-4 sm:py-6 rounded-2xl text-lg sm:text-xl font-bold shadow-premium hover:shadow-glow-lg transform hover:scale-105 transition-all duration-300"
+              to="/login"
+              className="inline-flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 px-6 py-3 rounded-xl border border-indigo-200 dark:border-indigo-800 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all duration-300 font-medium"
             >
-              <Sparkles size={24} className="animate-pulse" />
-              <span className="hidden sm:inline">Start Building with AI</span>
-              <span className="sm:hidden">Start Building</span>
-              <ArrowRight size={20} />
+              Sign In
+              <ArrowRight size={16} />
             </Link>
           </div>
           <p className="mt-6 text-gray-600 dark:text-gray-400 font-medium">
-            No setup required • Start building immediately
+            No setup required • Create your account and start building
           </p>
         </div>
 
@@ -125,9 +137,9 @@ function Home() {
               </div>
             </div>
             
-            <div className="grid md:grid-cols-2 gap-0 h-[400px]">
+            <div className="grid md:grid-cols-2 gap-0 min-h-[400px] md:h-[400px]">
               {/* Mock AI Prompt Panel */}
-              <div className="bg-gradient-to-br from-gray-50 to-indigo-50/50 p-8 border-r border-gray-200/50">
+              <div className="bg-gradient-to-br from-gray-50 to-indigo-50/50 p-4 md:p-8 border-r md:border-r border-b md:border-b-0 border-gray-200/50">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center">
                     <Sparkles className="text-white" size={16} />
@@ -166,7 +178,7 @@ function Home() {
               </div>
               
               {/* Mock Preview Panel */}
-              <div className="bg-gradient-to-br from-white to-blue-50/30 p-8">
+              <div className="bg-gradient-to-br from-white to-blue-50/30 p-4 md:p-8">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
                     <Eye className="text-white" size={16} />
@@ -174,8 +186,8 @@ function Home() {
                   <h4 className="font-bold text-gray-900 text-lg">Live Preview</h4>
                 </div>
                 
-                <div className="bg-gradient-to-br from-gray-50 to-indigo-50/50 rounded-xl p-6 h-72 flex items-center justify-center">
-                  <div className="card-premium rounded-xl shadow-premium p-8 w-full max-w-sm transform hover:scale-105 transition-all duration-300">
+                <div className="bg-gradient-to-br from-gray-50 to-indigo-50/50 rounded-xl p-4 md:p-6 h-48 md:h-72 flex items-center justify-center">
+                  <div className="card-premium rounded-xl shadow-premium p-4 md:p-8 w-full max-w-sm transform hover:scale-105 transition-all duration-300">
                     <h3 className="text-xl font-bold mb-6 text-gray-900 text-gradient">Welcome Back</h3>
                     <div className="space-y-4">
                       <div className="h-12 bg-gradient-to-r from-gray-100 to-gray-50 rounded-lg border border-gray-200 shadow-sm"></div>
@@ -189,7 +201,7 @@ function Home() {
               </div>
             </div>
             
-            <div className="bg-gradient-to-r from-gray-50 to-indigo-50/30 border-t border-gray-200/50 p-6 flex items-center justify-center gap-8 text-sm text-gray-700">
+            <div className="bg-gradient-to-r from-gray-50 to-indigo-50/30 border-t border-gray-200/50 p-4 md:p-6 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 text-sm text-gray-700">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full animate-pulse"></div>
                 <span className="font-medium">AI Generated</span>
@@ -206,9 +218,11 @@ function Home() {
           </div>
         </div>
 
+
+
         {/* Benefits */}
         <div className="mt-24 text-center relative z-10">
-          <h2 className="text-4xl font-bold text-gray-900 mb-16">
+          <h2 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-16">
             Why Choose AI UI Builder?
           </h2>
           
