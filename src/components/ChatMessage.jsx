@@ -1,4 +1,4 @@
-import { User, Sparkles, AlertCircle, Download, Eye } from 'lucide-react';
+import { User, Sparkles, AlertCircle, Download, Eye, WifiOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -40,6 +40,12 @@ function ChatMessage({ message }) {
           <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {message.sender}
           </span>
+          {message.isOffline && !isUser && (
+            <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-xs">
+              <WifiOff size={10} />
+              <span>Offline</span>
+            </div>
+          )}
           <span className="text-xs text-gray-500 dark:text-gray-400">
             {formatTimestamp(message.timestamp)}
           </span>
@@ -89,9 +95,16 @@ function ChatMessage({ message }) {
         {message.generatedCode && !isUser && (
           <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Generated Website
-              </h4>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Generated Website
+                </h4>
+                {message.isOffline && (
+                  <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-0.5 rounded-full">
+                    Demo Template
+                  </span>
+                )}
+              </div>
               <div className="flex gap-2">
                 <button className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 flex items-center gap-1">
                   <Eye size={12} />

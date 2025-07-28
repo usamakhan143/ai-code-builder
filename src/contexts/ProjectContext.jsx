@@ -21,6 +21,12 @@ export const ProjectProvider = ({ children }) => {
   const [chatHistory, setChatHistory] = useState([]);
   const [projectVersions, setProjectVersions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [firestoreError, setFirestoreError] = useState(null);
+
+  // Check if Firestore is available
+  const isFirestoreAvailable = () => {
+    return !firestoreError;
+  };
 
   // Create a new project
   const createProject = async (name, description = '') => {
@@ -39,7 +45,15 @@ export const ProjectProvider = ({ children }) => {
     };
 
     try {
-      await setDoc(doc(db, 'projects', projectId), project);
+      if (isFirestoreAvailable()) {
+        await setDoc(doc(db, 'projects', projectId), project);
+      } else {
+        // Fallback to localStorage
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        localProjects.push(project);
+        localStorage.setItem('ai-builder-projects', JSON.stringify(localProjects));
+      }
+
       setCurrentProject(project);
       setChatHistory([]);
       setProjectVersions([]);
@@ -47,7 +61,23 @@ export const ProjectProvider = ({ children }) => {
       return project;
     } catch (error) {
       console.error('Error creating project:', error);
-      throw error;
+      setFirestoreError(error);
+
+      // Try localStorage fallback
+      try {
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        localProjects.push(project);
+        localStorage.setItem('ai-builder-projects', JSON.stringify(localProjects));
+
+        setCurrentProject(project);
+        setChatHistory([]);
+        setProjectVersions([]);
+        await loadUserProjects();
+        return project;
+      } catch (localError) {
+        console.error('LocalStorage fallback failed:', localError);
+        throw error;
+      }
     }
   };
 
@@ -57,19 +87,37 @@ export const ProjectProvider = ({ children }) => {
 
     try {
       setLoading(true);
-      const q = query(
-        collection(db, 'projects'),
-        where('userId', '==', currentUser.uid),
-        orderBy('updatedAt', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
-      const userProjects = [];
-      querySnapshot.forEach((doc) => {
-        userProjects.push({ id: doc.id, ...doc.data() });
-      });
-      setProjects(userProjects);
+
+      if (isFirestoreAvailable()) {
+        const q = query(
+          collection(db, 'projects'),
+          where('userId', '==', currentUser.uid),
+          orderBy('updatedAt', 'desc')
+        );
+        const querySnapshot = await getDocs(q);
+        const userProjects = [];
+        querySnapshot.forEach((doc) => {
+          userProjects.push({ id: doc.id, ...doc.data() });
+        });
+        setProjects(userProjects);
+      } else {
+        // Fallback to localStorage
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const userProjects = localProjects.filter(project => project.userId === currentUser.uid);
+        setProjects(userProjects);
+      }
     } catch (error) {
       console.error('Error loading projects:', error);
+      setFirestoreError(error);
+
+      // Try localStorage fallback
+      try {
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const userProjects = localProjects.filter(project => project.userId === currentUser.uid);
+        setProjects(userProjects);
+      } catch (localError) {
+        console.error('LocalStorage fallback failed:', localError);
+      }
     } finally {
       setLoading(false);
     }
@@ -81,18 +129,48 @@ export const ProjectProvider = ({ children }) => {
 
     try {
       setLoading(true);
-      const docRef = doc(db, 'projects', projectId);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        const project = { id: docSnap.id, ...docSnap.data() };
-        setCurrentProject(project);
-        setChatHistory(project.chatHistory || []);
-        setProjectVersions(project.versions || []);
-        return project;
+
+      if (isFirestoreAvailable()) {
+        const docRef = doc(db, 'projects', projectId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const project = { id: docSnap.id, ...docSnap.data() };
+          setCurrentProject(project);
+          setChatHistory(project.chatHistory || []);
+          setProjectVersions(project.versions || []);
+          return project;
+        }
+      } else {
+        // Fallback to localStorage
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const project = localProjects.find(p => p.id === projectId && p.userId === currentUser.uid);
+
+        if (project) {
+          setCurrentProject(project);
+          setChatHistory(project.chatHistory || []);
+          setProjectVersions(project.versions || []);
+          return project;
+        }
       }
     } catch (error) {
       console.error('Error loading project:', error);
+      setFirestoreError(error);
+
+      // Try localStorage fallback
+      try {
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const project = localProjects.find(p => p.id === projectId && p.userId === currentUser.uid);
+
+        if (project) {
+          setCurrentProject(project);
+          setChatHistory(project.chatHistory || []);
+          setProjectVersions(project.versions || []);
+          return project;
+        }
+      } catch (localError) {
+        console.error('LocalStorage fallback failed:', localError);
+      }
     } finally {
       setLoading(false);
     }
@@ -112,12 +190,37 @@ export const ProjectProvider = ({ children }) => {
     setChatHistory(updatedHistory);
 
     try {
-      await updateDoc(doc(db, 'projects', currentProject.id), {
-        chatHistory: updatedHistory,
-        updatedAt: new Date().toISOString()
-      });
+      if (isFirestoreAvailable()) {
+        await updateDoc(doc(db, 'projects', currentProject.id), {
+          chatHistory: updatedHistory,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        // Update localStorage
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const projectIndex = localProjects.findIndex(p => p.id === currentProject.id);
+        if (projectIndex !== -1) {
+          localProjects[projectIndex].chatHistory = updatedHistory;
+          localProjects[projectIndex].updatedAt = new Date().toISOString();
+          localStorage.setItem('ai-builder-projects', JSON.stringify(localProjects));
+        }
+      }
     } catch (error) {
       console.error('Error updating chat history:', error);
+      setFirestoreError(error);
+
+      // Try localStorage fallback
+      try {
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const projectIndex = localProjects.findIndex(p => p.id === currentProject.id);
+        if (projectIndex !== -1) {
+          localProjects[projectIndex].chatHistory = updatedHistory;
+          localProjects[projectIndex].updatedAt = new Date().toISOString();
+          localStorage.setItem('ai-builder-projects', JSON.stringify(localProjects));
+        }
+      } catch (localError) {
+        console.error('LocalStorage fallback failed:', localError);
+      }
     }
 
     return newMessage;
@@ -137,12 +240,37 @@ export const ProjectProvider = ({ children }) => {
     setProjectVersions(updatedVersions);
 
     try {
-      await updateDoc(doc(db, 'projects', currentProject.id), {
-        versions: updatedVersions,
-        updatedAt: new Date().toISOString()
-      });
+      if (isFirestoreAvailable()) {
+        await updateDoc(doc(db, 'projects', currentProject.id), {
+          versions: updatedVersions,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        // Update localStorage
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const projectIndex = localProjects.findIndex(p => p.id === currentProject.id);
+        if (projectIndex !== -1) {
+          localProjects[projectIndex].versions = updatedVersions;
+          localProjects[projectIndex].updatedAt = new Date().toISOString();
+          localStorage.setItem('ai-builder-projects', JSON.stringify(localProjects));
+        }
+      }
     } catch (error) {
       console.error('Error updating project versions:', error);
+      setFirestoreError(error);
+
+      // Try localStorage fallback
+      try {
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const projectIndex = localProjects.findIndex(p => p.id === currentProject.id);
+        if (projectIndex !== -1) {
+          localProjects[projectIndex].versions = updatedVersions;
+          localProjects[projectIndex].updatedAt = new Date().toISOString();
+          localStorage.setItem('ai-builder-projects', JSON.stringify(localProjects));
+        }
+      } catch (localError) {
+        console.error('LocalStorage fallback failed:', localError);
+      }
     }
 
     return newVersion;
@@ -161,10 +289,34 @@ export const ProjectProvider = ({ children }) => {
     setCurrentProject(updatedProject);
 
     try {
-      await updateDoc(doc(db, 'projects', currentProject.id), updatedProject);
+      if (isFirestoreAvailable()) {
+        await updateDoc(doc(db, 'projects', currentProject.id), updatedProject);
+      } else {
+        // Update localStorage
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const projectIndex = localProjects.findIndex(p => p.id === currentProject.id);
+        if (projectIndex !== -1) {
+          localProjects[projectIndex] = updatedProject;
+          localStorage.setItem('ai-builder-projects', JSON.stringify(localProjects));
+        }
+      }
       await loadUserProjects(); // Refresh projects list
     } catch (error) {
       console.error('Error updating project:', error);
+      setFirestoreError(error);
+
+      // Try localStorage fallback
+      try {
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const projectIndex = localProjects.findIndex(p => p.id === currentProject.id);
+        if (projectIndex !== -1) {
+          localProjects[projectIndex] = updatedProject;
+          localStorage.setItem('ai-builder-projects', JSON.stringify(localProjects));
+        }
+        await loadUserProjects(); // Refresh projects list
+      } catch (localError) {
+        console.error('LocalStorage fallback failed:', localError);
+      }
     }
   };
 
@@ -186,6 +338,8 @@ export const ProjectProvider = ({ children }) => {
     chatHistory,
     projectVersions,
     loading,
+    firestoreError,
+    isFirestoreAvailable: isFirestoreAvailable(),
     createProject,
     loadProject,
     addChatMessage,

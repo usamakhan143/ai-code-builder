@@ -25,16 +25,19 @@ import ChatMessage from '../components/ChatMessage';
 import ProjectSidebar from '../components/ProjectSidebar';
 import FileChanges from '../components/FileChanges';
 
+
 function Workspace() {
   const { currentUser, logout } = useAuth();
-  const { 
-    currentProject, 
-    projects, 
-    chatHistory, 
-    addChatMessage, 
+  const {
+    currentProject,
+    projects,
+    chatHistory,
+    addChatMessage,
     addProjectVersion,
     createProject,
-    loadProject
+    loadProject,
+    firestoreError,
+    isFirestoreAvailable
   } = useProject();
 
   const [message, setMessage] = useState('');
@@ -44,6 +47,9 @@ function Workspace() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [networkError, setNetworkError] = useState(null);
+
 
   const handleSendMessage = async () => {
     if (!message.trim() || isGenerating) return;
@@ -63,8 +69,12 @@ function Workspace() {
 
       // Generate AI response
       const result = await generateWebsiteCode(userMessage);
-      
+
       if (result.success) {
+        // Clear any previous errors
+        setIsOfflineMode(false);
+        setNetworkError(null);
+
         // Add AI response to chat
         await addChatMessage({
           type: 'assistant',
@@ -86,6 +96,7 @@ function Workspace() {
 
         setGeneratedCode(result.data);
       } else {
+        setNetworkError(result.error);
         await addChatMessage({
           type: 'assistant',
           content: `I apologize, but I encountered an error while generating the website: ${result.error}`,
@@ -151,6 +162,40 @@ function Workspace() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col transition-all duration-300 min-w-0">
+        {/* Network Status Notifications */}
+        {(!isFirestoreAvailable || networkError) && (
+          <div className={`border-b px-4 py-2 ${
+            networkError
+              ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+              : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+          }`}>
+            <div className={`flex items-center gap-2 ${
+              networkError
+                ? 'text-red-800 dark:text-red-200'
+                : 'text-yellow-800 dark:text-yellow-200'
+            }`}>
+              <AlertCircle size={16} />
+              <span className="text-sm">
+                {networkError
+                  ? `Error: ${networkError}`
+                  : 'Your projects are saved locally due to Firestore connectivity issues.'
+                }
+              </span>
+              {networkError && (
+                <button
+                  onClick={() => {
+                    setNetworkError(null);
+                    setIsOfflineMode(false);
+                  }}
+                  className="ml-2 text-xs bg-red-200 dark:bg-red-800 px-2 py-1 rounded hover:bg-red-300 dark:hover:bg-red-700 transition-colors"
+                >
+                  Dismiss
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4 min-w-0">
@@ -364,6 +409,8 @@ function Workspace() {
           </div>
         </div>
       </div>
+
+
 
       {/* New Project Modal */}
       {showNewProjectModal && (
