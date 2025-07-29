@@ -1,24 +1,41 @@
-import { useState } from 'react';
-import { 
-  Folder, 
-  Plus, 
-  ChevronLeft, 
-  ChevronRight, 
-  Clock, 
+import React, { useState, useEffect } from 'react';
+import {
+  Folder,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
   MessageSquare,
   Settings,
-  Search
+  Search,
+  Trash2
 } from 'lucide-react';
 
-function ProjectSidebar({ 
-  isOpen, 
-  onToggle, 
-  projects, 
-  currentProject, 
-  onProjectSelect, 
-  onNewProject 
+function ProjectSidebar({
+  isOpen,
+  onToggle,
+  projects,
+  currentProject,
+  onProjectSelect,
+  onNewProject,
+  onDeleteProject
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+
+  const handleDeleteProject = async (projectId) => {
+    const projectToDelete = projects.find(p => p.id === projectId);
+    const projectName = projectToDelete?.name || 'this project';
+
+    if (window.confirm(`Are you sure you want to delete "${projectName}"? This action cannot be undone.`)) {
+      try {
+        await onDeleteProject(projectId);
+      } catch (error) {
+        console.error('Failed to delete project:', error);
+        alert('Failed to delete project. Please try again.');
+      }
+    }
+  };
 
   const filteredProjects = projects.filter(project =>
     project.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -112,16 +129,18 @@ function ProjectSidebar({
               ) : (
                 <div className="p-2">
                   {filteredProjects.map((project) => (
-                    <button
+                    <div
                       key={project.id}
-                      onClick={() => onProjectSelect(project.id)}
-                      className={`w-full text-left p-3 rounded-lg mb-2 transition-all duration-200 group ${
+                      className={`relative rounded-lg mb-2 transition-all duration-200 group ${
                         currentProject?.id === project.id
                           ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800'
                           : 'hover:bg-gray-50 dark:hover:bg-gray-700 border border-transparent'
                       }`}
                     >
-                      <div className="flex items-start justify-between">
+                      <button
+                        onClick={() => onProjectSelect(project.id)}
+                        className="w-full text-left p-3 pr-8"
+                      >
                         <div className="flex-1 min-w-0">
                           <h3 className={`font-medium text-sm truncate ${
                             currentProject?.id === project.id
@@ -150,14 +169,26 @@ function ProjectSidebar({
                             )}
                           </div>
                         </div>
-                        
+
                         {currentProject?.id === project.id && (
-                          <div className="ml-2 flex-shrink-0">
+                          <div className="absolute top-3 right-8">
                             <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
                           </div>
                         )}
-                      </div>
-                    </button>
+                      </button>
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteProject(project.id);
+                        }}
+                        className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-all"
+                        title="Delete project"
+                      >
+                        <Trash2 size={14} className="text-red-500 hover:text-red-600" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -170,6 +201,8 @@ function ProjectSidebar({
                 Settings
               </button>
             </div>
+
+
           </>
         )}
       </div>
@@ -178,7 +211,7 @@ function ProjectSidebar({
       <button
         onClick={onToggle}
         className={`fixed top-1/2 transform -translate-y-1/2 z-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-r-lg p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300 ${
-          isOpen ? 'left-80' : 'left-0'
+          isOpen ? 'left-80 lg:left-80' : 'left-0'
         }`}
       >
         {isOpen ? (

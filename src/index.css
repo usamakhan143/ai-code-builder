@@ -178,3 +178,92 @@ input:focus, textarea:focus {
 button, a, input, textarea, [role="button"] {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Text wrapping and responsiveness utilities */
+.word-wrap {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Chat message responsiveness */
+.chat-message {
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Ensure proper responsive behavior */
+@media (max-width: 640px) {
+  .chat-message {
+    max-width: 90%;
+  }
+}
+
+/* File tree scrolling */
+.file-tree {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.file-tree::-webkit-scrollbar {
+  width: 6px;
+}
+
+.file-tree::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.file-tree::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.file-tree::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.7);
+}
+
+/* Mobile chat fixes */
+@media (max-width: 640px) {
+  .chat-container {
+    height: 100vh;
+    height: calc(100vh - env(safe-area-inset-bottom));
+    height: calc(100dvh - env(safe-area-inset-bottom));
+  }
+
+  .chat-messages {
+    height: calc(100vh - 200px);
+    height: calc(100dvh - 200px);
+    max-height: calc(100vh - 200px);
+    max-height: calc(100dvh - 200px);
+  }
+
+  .chat-input {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    z-index: 10;
+  }
+
+  .dark .chat-input {
+    background: rgb(31, 41, 55);
+  }
+}
+
+/* Prevent horizontal scroll on mobile */
+@media (max-width: 640px) {
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  * {
+    max-width: 100%;
+  }
+}
+
+/* Fix textarea on iOS */
+textarea {
+  -webkit-appearance: none;
+  resize: none;
+}

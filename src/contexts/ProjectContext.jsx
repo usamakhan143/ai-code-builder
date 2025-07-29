@@ -1,8 +1,30 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { collection, doc, setDoc, getDoc, updateDoc, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase-clean';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
+
+// Utility function to remove undefined values from objects for Firebase
+const cleanDataForFirebase = (obj) => {
+  if (obj === null || obj === undefined) return null;
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanDataForFirebase(item)).filter(item => item !== undefined);
+  }
+
+  if (typeof obj === 'object') {
+    const cleaned = {};
+    Object.keys(obj).forEach(key => {
+      const value = obj[key];
+      if (value !== undefined) {
+        cleaned[key] = cleanDataForFirebase(value);
+      }
+    });
+    return cleaned;
+  }
+
+  return obj;
+};
 
 const ProjectContext = createContext();
 
@@ -46,7 +68,9 @@ export const ProjectProvider = ({ children }) => {
 
     try {
       if (isFirestoreAvailable()) {
-        await setDoc(doc(db, 'projects', projectId), project);
+        // Clean project data for Firebase
+        const cleanProject = cleanDataForFirebase(project);
+        await setDoc(doc(db, 'projects', projectId), cleanProject);
       } else {
         // Fallback to localStorage
         const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
@@ -180,9 +204,18 @@ export const ProjectProvider = ({ children }) => {
   const addChatMessage = async (message) => {
     if (!currentProject) return;
 
+    // Debug: Check for undefined values
+    const undefinedKeys = Object.keys(message).filter(key => message[key] === undefined);
+    if (undefinedKeys.length > 0) {
+      console.warn('Found undefined values in message:', undefinedKeys, message);
+    }
+
+    // Clean the message object to remove undefined values
+    const cleanMessage = cleanDataForFirebase(message);
+
     const newMessage = {
       id: uuidv4(),
-      ...message,
+      ...cleanMessage,
       timestamp: new Date().toISOString()
     };
 
@@ -191,8 +224,11 @@ export const ProjectProvider = ({ children }) => {
 
     try {
       if (isFirestoreAvailable()) {
+        // Clean the entire history array for Firebase
+        const cleanedHistory = cleanDataForFirebase(updatedHistory);
+
         await updateDoc(doc(db, 'projects', currentProject.id), {
-          chatHistory: updatedHistory,
+          chatHistory: cleanedHistory,
           updatedAt: new Date().toISOString()
         });
       } else {
@@ -230,9 +266,18 @@ export const ProjectProvider = ({ children }) => {
   const addProjectVersion = async (version) => {
     if (!currentProject) return;
 
+    // Debug: Check for undefined values
+    const undefinedKeys = Object.keys(version).filter(key => version[key] === undefined);
+    if (undefinedKeys.length > 0) {
+      console.warn('Found undefined values in version:', undefinedKeys, version);
+    }
+
+    // Clean the version object to remove undefined values
+    const cleanVersion = cleanDataForFirebase(version);
+
     const newVersion = {
       id: uuidv4(),
-      ...version,
+      ...cleanVersion,
       timestamp: new Date().toISOString()
     };
 
@@ -241,8 +286,11 @@ export const ProjectProvider = ({ children }) => {
 
     try {
       if (isFirestoreAvailable()) {
+        // Clean the entire versions array for Firebase
+        const cleanedVersions = cleanDataForFirebase(updatedVersions);
+
         await updateDoc(doc(db, 'projects', currentProject.id), {
-          versions: updatedVersions,
+          versions: cleanedVersions,
           updatedAt: new Date().toISOString()
         });
       } else {
@@ -290,7 +338,9 @@ export const ProjectProvider = ({ children }) => {
 
     try {
       if (isFirestoreAvailable()) {
-        await updateDoc(doc(db, 'projects', currentProject.id), updatedProject);
+        // Clean the updated project data for Firebase
+        const cleanUpdatedProject = cleanDataForFirebase(updatedProject);
+        await updateDoc(doc(db, 'projects', currentProject.id), cleanUpdatedProject);
       } else {
         // Update localStorage
         const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
@@ -320,6 +370,55 @@ export const ProjectProvider = ({ children }) => {
     }
   };
 
+  // Delete project
+  const deleteProject = async (projectId) => {
+    if (!currentUser || !projectId) return;
+
+    try {
+      if (isFirestoreAvailable()) {
+        await deleteDoc(doc(db, 'projects', projectId));
+      } else {
+        // Remove from localStorage
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const filteredProjects = localProjects.filter(p => p.id !== projectId);
+        localStorage.setItem('ai-builder-projects', JSON.stringify(filteredProjects));
+      }
+
+      // If deleted project was current, clear it
+      if (currentProject?.id === projectId) {
+        setCurrentProject(null);
+        setChatHistory([]);
+        setProjectVersions([]);
+      }
+
+      await loadUserProjects(); // Refresh projects list
+      return true;
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      setFirestoreError(error);
+
+      // Try localStorage fallback
+      try {
+        const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+        const filteredProjects = localProjects.filter(p => p.id !== projectId);
+        localStorage.setItem('ai-builder-projects', JSON.stringify(filteredProjects));
+
+        // If deleted project was current, clear it
+        if (currentProject?.id === projectId) {
+          setCurrentProject(null);
+          setChatHistory([]);
+          setProjectVersions([]);
+        }
+
+        await loadUserProjects(); // Refresh projects list
+        return true;
+      } catch (localError) {
+        console.error('LocalStorage fallback failed:', localError);
+        throw error;
+      }
+    }
+  };
+
   // Load projects when user changes
   useEffect(() => {
     if (currentUser) {
@@ -342,6 +441,7 @@ export const ProjectProvider = ({ children }) => {
     isFirestoreAvailable: isFirestoreAvailable(),
     createProject,
     loadProject,
+    deleteProject,
     addChatMessage,
     addProjectVersion,
     updateProject,
