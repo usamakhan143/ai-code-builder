@@ -15,7 +15,6 @@ import {
 } from 'lucide-react'
 import Preview from '../components/Preview'
 import ThemeToggle from '../components/ThemeToggle'
-import { generateWebsiteCode } from '../services/openai'
 import { downloadProjectAsZip } from '../services/zipDownload'
 
 function Editor() {
@@ -41,31 +40,44 @@ function Editor() {
     setGeneratedCode(null)
 
     try {
-      const result = await generateWebsiteCode(prompt)
+      // TODO: AI generation will be implemented here
+      // For now, just show a placeholder response
+      setTimeout(() => {
+        const mockGeneratedData = {
+          html: `
+            <div style="padding: 40px; font-family: Arial, sans-serif; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+              <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 500px;">
+                <h1 style="color: #333; margin-bottom: 20px;">🚧 AI Generation Coming Soon!</h1>
+                <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">Your request: "${prompt}"</p>
+                <p style="color: #666; line-height: 1.6;">The AI functionality has been removed and will be reimplemented with new features. Stay tuned!</p>
+              </div>
+            </div>
+          `,
+          description: `Placeholder response for: ${prompt}`
+        }
 
-      if (result.success) {
-        setGeneratedCode(result.data)
+        setGeneratedCode(mockGeneratedData)
+
         // Create a single component representing the generated website
         const websiteComponent = {
           type: 'Website',
           props: {
-            html: result.data.html,
-            description: result.data.description
+            html: mockGeneratedData.html,
+            description: mockGeneratedData.description
           },
           style: {},
           position: { x: 0, y: 0 }
         }
 
         addComponent(websiteComponent)
-      } else {
-        setError(result.error)
-      }
+        setIsGenerating(false)
+      }, 2000) // Simulate processing time
+
     } catch (err) {
       console.error('Error generating code:', err)
-      setError('Failed to generate website. Please check your OpenAI API key and try again.')
+      setError('AI functionality is currently unavailable. It will be reimplemented soon.')
+      setIsGenerating(false)
     }
-
-    setIsGenerating(false)
   }
 
   const handleSave = () => {
@@ -233,7 +245,7 @@ function Editor() {
 
             {generatedCode && (
               <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
-                <p className="text-sm text-green-700 dark:text-green-400 font-medium">✓ Website generated successfully!</p>
+                <p className="text-sm text-green-700 dark:text-green-400 font-medium">�� Website generated successfully!</p>
                 <p className="text-xs text-green-600 dark:text-green-500 mt-1">{generatedCode.description}</p>
               </div>
             )}

@@ -6,7 +6,7 @@ import {
   onAuthStateChanged,
   updateProfile
 } from 'firebase/auth';
-import { auth } from '../config/firebase-clean';
+import { auth, isFirebaseAvailable, handleFirebaseError } from '../config/firebase';
 
 const AuthContext = createContext();
 

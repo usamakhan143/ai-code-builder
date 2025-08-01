@@ -1,20 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useProject } from '../contexts/ProjectContext';
-import { generateWebsiteCode } from '../services/openai';
-import {
-  analyzeProjectComplexity,
-  createProjectChunks,
-  processProjectChunks,
-  estimateProjectCost
-} from '../services/chunking';
-import {
-  buildConversationContext,
-  createContextAwarePrompt,
-  analyzeRequestType,
-  mergeProjectChanges,
-  extractChangeSummary
-} from '../services/chatContext';
 import { downloadProjectAsZip } from '../services/zipDownload';
 import { 
   MessageSquare, 
@@ -39,7 +25,6 @@ import ProjectSidebar from '../components/ProjectSidebar';
 import FileChanges from '../components/FileChanges';
 import ChatHistory from '../components/ChatHistory';
 import FileTree from '../components/FileTree';
-
 
 function Workspace() {
   const { currentUser, logout } = useAuth();
@@ -67,10 +52,6 @@ function Workspace() {
   const [networkError, setNetworkError] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewMode, setPreviewMode] = useState('desktop'); // desktop, tablet, mobile
-  const [isChunkedGeneration, setIsChunkedGeneration] = useState(false);
-  const [chunkingProgress, setChunkingProgress] = useState(null);
-  const [showChunkingPreview, setShowChunkingPreview] = useState(false);
-
 
   const handleSendMessage = async () => {
     if (!message.trim() || isGenerating) return;
@@ -88,200 +69,31 @@ function Workspace() {
       const userMessage = message;
       setMessage('');
 
-      // Build conversation context
-      const context = buildConversationContext(chatHistory, currentProject);
-
-      // Create context-aware prompt
-      const contextualPrompt = createContextAwarePrompt(userMessage, context);
-
-      // Analyze request type (new project, modification, addition)
-      const requestType = analyzeRequestType(userMessage, context);
-
-      // Add context awareness message ONLY for actual follow-up requests
-      if (!context.isFirstMessage && context.totalMessages > 0 && requestType !== 'new_project') {
+      // TODO: AI generation will be implemented here
+      // For now, just add a placeholder response
+      setTimeout(async () => {
         await addChatMessage({
           type: 'assistant',
-          content: `🧠 **Context Understood**: I see this is ${requestType === 'modification' ? 'a modification' : requestType === 'addition' ? 'an addition' : 'an enhancement'} to your existing **${context.projectContext.name}** project.
+          content: `🚧 **AI Generation Coming Soon!**
 
-Current project has:
-- ${context.projectContext.pages.length} pages: ${context.projectContext.pages.join(', ')}
-- ${context.projectContext.features.length} features implemented
-- ${context.totalMessages} previous interactions
+Your request: "${userMessage}"
 
-Working on your request...`,
+The AI functionality has been removed and will be reimplemented with new features. Stay tuned!`,
           sender: 'AI Assistant',
-          isContextual: true
+          isPlaceholder: true
         });
-      }
+        setIsGenerating(false);
+      }, 1000);
 
-      // Analyze if chunking is needed (but consider context)
-      const complexity = analyzeProjectComplexity(userMessage);
-
-      if (complexity.needsChunking && context.isFirstMessage) {
-        // Use chunked generation for complex new projects
-        await handleChunkedGeneration(userMessage, contextualPrompt);
-      } else {
-        // Use context-aware generation
-        await handleContextAwareGeneration(userMessage, contextualPrompt, context, requestType);
-      }
     } catch (error) {
-      console.error('Error generating website:', error);
+      console.error('Error sending message:', error);
       await addChatMessage({
         type: 'assistant',
-        content: 'I apologize, but I encountered an unexpected error. Please try again.',
+        content: `❌ **Error:** ${error.message}`,
         sender: 'AI Assistant',
         isError: true
       });
-    } finally {
       setIsGenerating(false);
-      setIsChunkedGeneration(false);
-      setChunkingProgress(null);
-      // Ensure message input is reset and available
-      setMessage('');
-    }
-  };
-
-  const handleContextAwareGeneration = async (userMessage, contextualPrompt, context, requestType) => {
-    const result = await generateWebsiteCode(userMessage, contextualPrompt);
-
-    if (result.success) {
-      setNetworkError(null);
-
-      // Merge changes with existing project if this is a modification
-      const finalProject = context.isFirstMessage ?
-        result.data :
-        mergeProjectChanges(context.currentProjectState, result.data, requestType);
-
-      const isReactProject = finalProject.projectStructure;
-      const changeSummary = extractChangeSummary(result.data, requestType);
-
-      // Create appropriate response message
-      let responseContent;
-      if (context.isFirstMessage) {
-        responseContent = isReactProject
-          ? `✨ **New React Project Created!**\n\nI've generated a complete React project: "${userMessage}"\n\n📊 **Project Overview:**\n- ${finalProject.pages?.length || 0} pages\n- ${finalProject.features?.length || 0} features\n- Modern components and routing`
-          : `✨ **Website Generated!**\n\nI've created a website based on your request: "${userMessage}"`;
-      } else {
-        responseContent = `✅ **Project Updated Successfully!**\n\n🔄 **Changes Made:** ${changeSummary}\n\n📊 **Updated Project:**\n- ${finalProject.pages?.length || 0} total pages\n- ${finalProject.features?.length || 0} total features\n- Request type: ${requestType}\n\nYour project has been enhanced with the requested changes!`;
-      }
-
-      await addChatMessage({
-        type: 'assistant',
-        content: responseContent,
-        generatedCode: finalProject,
-        sender: 'AI Assistant',
-        isReactProject: Boolean(isReactProject),
-        isContextual: Boolean(!context.isFirstMessage),
-        requestType: requestType || 'new_project'
-      });
-
-      await addProjectVersion({
-        prompt: userMessage || '',
-        code: finalProject || {},
-        isReactProject: Boolean(isReactProject),
-        requestType: requestType || 'new_project',
-        isContextual: Boolean(!context.isFirstMessage),
-        changes: isReactProject
-          ? Object.keys(result.data.projectStructure || {}).map(filePath => ({
-              type: requestType || 'created',
-              file: filePath || 'unknown',
-              description: `${requestType || 'created'}: ${filePath || 'unknown'}`
-            }))
-          : [{
-              type: requestType || 'created',
-              file: 'index.html',
-              description: `${requestType || 'created'}: main HTML file`
-            }]
-      });
-
-      setGeneratedCode(finalProject);
-    } else {
-      setNetworkError(result.error);
-      await addChatMessage({
-        type: 'assistant',
-        content: `I apologize, but I encountered an error while ${context.isFirstMessage ? 'generating' : 'updating'} the website: ${result.error}`,
-        sender: 'AI Assistant',
-        isError: true
-      });
-    }
-  };
-
-  const handleRegularGeneration = async (userMessage) => {
-    // This is now handled by handleContextAwareGeneration
-    const context = { isFirstMessage: true };
-    const contextualPrompt = createContextAwarePrompt(userMessage, context);
-    await handleContextAwareGeneration(userMessage, contextualPrompt, context, 'new_project');
-  };
-
-  const handleChunkedGeneration = async (userMessage, contextualPrompt = null) => {
-    setIsChunkedGeneration(true);
-
-    // Create chunks
-    const chunks = createProjectChunks(userMessage);
-    const costEstimate = estimateProjectCost(chunks);
-
-    // Show chunking preview
-    await addChatMessage({
-      type: 'assistant',
-      content: `I'll generate this complex project in ${chunks.length} parts for better quality:
-
-🔄 **Chunked Generation Plan:**
-${chunks.map((chunk, i) => `${i + 1}. ${chunk.description}`).join('\n')}
-
-📊 **Estimates:**
-- Total chunks: ${costEstimate.totalChunks}
-- Estimated tokens: ${costEstimate.totalTokens.toLocaleString()}
-- Estimated time: ${Math.round(costEstimate.estimatedTime / 60)} minutes
-
-Starting generation...`,
-      sender: 'AI Assistant',
-      isChunked: true
-    });
-
-    // Process chunks
-    const result = await processProjectChunks(chunks, (progress) => {
-      setChunkingProgress(progress);
-    });
-
-    if (result.success) {
-      setNetworkError(null);
-
-      await addChatMessage({
-        type: 'assistant',
-        content: `✅ **Chunked generation completed!**
-
-Generated a comprehensive React project with:
-- ${result.data.pages?.length || 0} pages
-- ${Object.keys(result.data.projectStructure || {}).length} files
-- ${result.data.features?.length || 0} features
-
-The project is now ready for preview and download!`,
-        generatedCode: result.data || {},
-        sender: 'AI Assistant',
-        isReactProject: true,
-        isChunked: true
-      });
-
-      await addProjectVersion({
-        prompt: userMessage || '',
-        code: result.data || {},
-        isReactProject: true,
-        isChunked: true,
-        changes: Object.keys(result.data.projectStructure || {}).map(filePath => ({
-          type: 'created',
-          file: filePath || 'unknown',
-          description: `Generated ${filePath || 'unknown'} (chunked)`
-        }))
-      });
-
-      setGeneratedCode(result.data);
-    } else {
-      await addChatMessage({
-        type: 'assistant',
-        content: `❌ Chunked generation encountered issues. Some parts may be incomplete. Please try again or use a simpler prompt.`,
-        sender: 'AI Assistant',
-        isError: true
-      });
     }
   };
 
@@ -316,237 +128,84 @@ The project is now ready for preview and download!`,
     }
   };
 
-  const generateReactPreview = (projectStructure) => {
-    // Create a beautiful HTML preview that represents the React project
-    const appComponent = projectStructure['src/App.js'] || '';
-    const globalStyles = projectStructure['src/styles/globals.css'] || '';
+  // Mock data for demonstration
+  const mockProjectFiles = {
+    'src/App.js': `import React from 'react';
 
-    // Extract page names from the project structure
-    const pageFiles = Object.keys(projectStructure).filter(path => path.includes('/pages/'));
-    const pages = pageFiles.map(path => path.split('/').pop().replace('.jsx', ''));
-
-    return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>React Project Preview</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-      ${globalStyles}
-      .page { display: none; }
-      .page.active { display: block; }
-      .nav-link.active { color: #3b82f6; border-bottom: 2px solid #3b82f6; }
-    </style>
-</head>
-<body class="bg-gray-50">
-    <div id="root">
-        <!-- Header with Navigation -->
-        <header class="bg-white shadow-sm border-b">
-            <div class="max-w-7xl mx-auto px-4">
-                <div class="flex justify-between items-center py-4">
-                    <div class="text-2xl font-bold text-gray-900">React App</div>
-                    <nav class="space-x-6">
-                        ${pages.map((page, index) => `
-                            <a href="#" data-route="${page}" class="nav-link px-3 py-2 text-gray-700 hover:text-blue-600 transition-colors ${index === 0 ? 'active' : ''}">
-                                ${page}
-                            </a>
-                        `).join('')}
-                    </nav>
-                </div>
-            </div>
-        </header>
-
-        <!-- Page Content -->
-        <main>
-            ${pages.map((page, index) => `
-                <div class="page ${index === 0 ? 'active' : ''}" data-page="${page}">
-                    ${generatePageContent(page, projectStructure)}
-                </div>
-            `).join('')}
-        </main>
-
-        <!-- Footer -->
-        <footer class="bg-gray-800 text-white mt-16">
-            <div class="max-w-7xl mx-auto px-4 py-8">
-                <div class="text-center">
-                    <p>&copy; 2024 React Application. Built with modern components.</p>
-                </div>
-            </div>
-        </footer>
+function App() {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto py-6 px-4">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Sample Project
+          </h1>
+        </div>
+      </header>
+      <main className="max-w-7xl mx-auto py-6 px-4">
+        <p className="text-gray-600">
+          This is a sample project structure. 
+          AI generation coming soon!
+        </p>
+      </main>
     </div>
+  );
+}
 
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const navLinks = document.querySelectorAll('[data-route]');
-        const pages = document.querySelectorAll('[data-page]');
-
-        navLinks.forEach(link => {
-          link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const targetPage = e.target.getAttribute('data-route');
-
-            // Update active nav link
-            navLinks.forEach(nl => nl.classList.remove('active'));
-            e.target.classList.add('active');
-
-            // Show target page
-            pages.forEach(page => {
-              page.classList.remove('active');
-              if (page.getAttribute('data-page') === targetPage) {
-                page.classList.add('active');
-              }
-            });
-          });
-        });
-      });
-    </script>
-</body>
-</html>`;
+export default App;`,
+    'package.json': `{
+  "name": "sample-project",
+  "version": "1.0.0",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}`,
+    'public/index.html': `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sample Project</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>`
   };
 
-  const generatePageContent = (pageName, projectStructure) => {
-    const pageFile = `src/pages/${pageName}.jsx`;
-    const pageContent = projectStructure[pageFile] || '';
-
-    // Generate different content based on page name
-    if (pageName.toLowerCase() === 'home') {
-      return `
-        <div class="min-h-screen">
-          <!-- Hero Section -->
-          <section class="bg-gradient-to-br from-blue-600 to-purple-700 text-white py-20">
-            <div class="max-w-7xl mx-auto px-4 text-center">
-              <h1 class="text-5xl font-bold mb-6">Welcome to Our Platform</h1>
-              <p class="text-xl mb-8 opacity-90">Build amazing experiences with our modern solutions</p>
-              <button class="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-                Get Started
-              </button>
-            </div>
-          </section>
-
-          <!-- Features Section -->
-          <section class="py-16 bg-white">
-            <div class="max-w-7xl mx-auto px-4">
-              <h2 class="text-3xl font-bold text-center mb-12">Our Features</h2>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="text-center p-6">
-                  <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span class="text-blue-600 text-2xl">⚡</span>
-                  </div>
-                  <h3 class="text-xl font-semibold mb-3">Fast Performance</h3>
-                  <p class="text-gray-600">Lightning-fast loading and responsive design for all devices.</p>
-                </div>
-                <div class="text-center p-6">
-                  <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span class="text-green-600 text-2xl">🔒</span>
-                  </div>
-                  <h3 class="text-xl font-semibold mb-3">Secure</h3>
-                  <p class="text-gray-600">Enterprise-grade security to protect your data and privacy.</p>
-                </div>
-                <div class="text-center p-6">
-                  <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span class="text-purple-600 text-2xl">🎨</span>
-                  </div>
-                  <h3 class="text-xl font-semibold mb-3">Beautiful Design</h3>
-                  <p class="text-gray-600">Modern, clean interface designed for optimal user experience.</p>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-      `;
-    } else if (pageName.toLowerCase() === 'about') {
-      return `
-        <div class="min-h-screen py-16">
-          <div class="max-w-4xl mx-auto px-4">
-            <h1 class="text-4xl font-bold text-gray-900 mb-8">About Us</h1>
-            <div class="prose prose-lg">
-              <p class="text-xl text-gray-600 mb-6">We are a team of passionate developers and designers committed to creating exceptional digital experiences.</p>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
-                <div class="bg-white p-6 rounded-lg shadow-sm">
-                  <h3 class="text-xl font-semibold mb-3">Our Mission</h3>
-                  <p class="text-gray-600">To empower businesses and individuals with cutting-edge technology solutions that drive growth and innovation.</p>
-                </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm">
-                  <h3 class="text-xl font-semibold mb-3">Our Vision</h3>
-                  <p class="text-gray-600">To be the leading provider of digital solutions that transform the way people work and live.</p>
-                </div>
-              </div>
-            </div>
+  const generateBasicHTMLPreview = () => {
+    return `
+      <html>
+        <head>
+          <title>Preview Coming Soon</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              padding: 40px; 
+              background: #f5f5f5; 
+              margin: 0;
+            }
+            .container {
+              background: white;
+              padding: 40px;
+              border-radius: 8px;
+              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+              text-align: center;
+            }
+            h1 { color: #333; margin-bottom: 20px; }
+            p { color: #666; line-height: 1.6; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>🚧 Preview Coming Soon</h1>
+            <p>The AI website generation functionality is being rebuilt.</p>
+            <p>Soon you'll be able to generate and preview websites here!</p>
           </div>
-        </div>
-      `;
-    } else if (pageName.toLowerCase() === 'contact') {
-      return `
-        <div class="min-h-screen py-16">
-          <div class="max-w-4xl mx-auto px-4">
-            <h1 class="text-4xl font-bold text-gray-900 mb-8">Contact Us</h1>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <h3 class="text-xl font-semibold mb-4">Get in Touch</h3>
-                <div class="space-y-4">
-                  <div class="flex items-center">
-                    <span class="text-gray-500 mr-3">📧</span>
-                    <span>hello@example.com</span>
-                  </div>
-                  <div class="flex items-center">
-                    <span class="text-gray-500 mr-3">📞</span>
-                    <span>+1 (555) 123-4567</span>
-                  </div>
-                  <div class="flex items-center">
-                    <span class="text-gray-500 mr-3">📍</span>
-                    <span>123 Business St, City, State 12345</span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <form class="space-y-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                    <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input type="email" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                    <textarea rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                  </div>
-                  <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors">
-                    Send Message
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    } else {
-      // Generic page content
-      return `
-        <div class="min-h-screen py-16">
-          <div class="max-w-7xl mx-auto px-4">
-            <h1 class="text-4xl font-bold text-gray-900 mb-8">${pageName}</h1>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div class="bg-white p-6 rounded-lg shadow-sm">
-                <h3 class="text-xl font-semibold mb-3">Feature 1</h3>
-                <p class="text-gray-600">This is a sample feature section for the ${pageName} page.</p>
-              </div>
-              <div class="bg-white p-6 rounded-lg shadow-sm">
-                <h3 class="text-xl font-semibold mb-3">Feature 2</h3>
-                <p class="text-gray-600">Another feature section with compelling content.</p>
-              </div>
-              <div class="bg-white p-6 rounded-lg shadow-sm">
-                <h3 class="text-xl font-semibold mb-3">Feature 3</h3>
-                <p class="text-gray-600">A third feature to complete the layout design.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    }
+        </body>
+      </html>
+    `;
   };
 
   return (
@@ -608,6 +267,9 @@ The project is now ready for preview and download!`,
               <h1 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-gray-100 truncate">
                 {currentProject ? currentProject.name : 'AI UI Builder'}
               </h1>
+              <div className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs rounded-md">
+                Static Mode
+              </div>
             </div>
           </div>
 
@@ -703,7 +365,6 @@ The project is now ready for preview and download!`,
                     chatHistory={chatHistory}
                     currentProject={currentProject}
                     onMessageClick={(message) => {
-                      // Switch to chat tab and scroll to message
                       setActiveTab('chat');
                     }}
                   />
@@ -724,7 +385,7 @@ The project is now ready for preview and download!`,
                             Start a conversation
                           </h3>
                           <p className="text-gray-600 dark:text-gray-400 mb-4">
-                            Describe the website you want to create and I'll help you build it step by step.
+                            The AI functionality is being rebuilt. Soon you'll be able to generate websites by describing what you want to create.
                           </p>
                           <div className="text-sm text-gray-500 dark:text-gray-500">
                             Try: "Create a portfolio website for a photographer"
@@ -743,47 +404,12 @@ The project is now ready for preview and download!`,
                           <Sparkles className="text-white" size={16} />
                         </div>
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border border-gray-200 dark:border-gray-700 min-w-0 flex-1">
-                          {isChunkedGeneration && chunkingProgress ? (
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2">
-                                <Loader2 size={16} className="animate-spin text-indigo-500" />
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                  Chunked Generation in Progress
-                                </span>
-                              </div>
-
-                              <div className="space-y-2">
-                                <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-                                  <span>Chunk {chunkingProgress.currentChunk} of {chunkingProgress.totalChunks}</span>
-                                  <span>{Math.round((chunkingProgress.currentChunk / chunkingProgress.totalChunks) * 100)}%</span>
-                                </div>
-
-                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                  <div
-                                    className={`h-2 rounded-full transition-all duration-500 ${
-                                      chunkingProgress.status === 'error' ? 'bg-red-500' :
-                                      chunkingProgress.status === 'completed' ? 'bg-green-500' :
-                                      'bg-indigo-500'
-                                    }`}
-                                    style={{ width: `${(chunkingProgress.currentChunk / chunkingProgress.totalChunks) * 100}%` }}
-                                  ></div>
-                                </div>
-
-                                <div className="text-xs text-gray-600 dark:text-gray-400">
-                                  {chunkingProgress.status === 'processing' && `🔄 Processing: ${chunkingProgress.chunkDescription}`}
-                                  {chunkingProgress.status === 'completed' && `✅ Completed: ${chunkingProgress.chunkDescription}`}
-                                  {chunkingProgress.status === 'error' && `❌ Error: ${chunkingProgress.error}`}
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <Loader2 size={16} className="animate-spin text-indigo-500" />
-                              <span className="text-sm text-gray-600 dark:text-gray-400">
-                                {isChunkedGeneration ? 'Analyzing project complexity...' : 'Generating your website...'}
-                              </span>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <Loader2 size={16} className="animate-spin text-indigo-500" />
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                              Processing your request...
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -824,98 +450,74 @@ The project is now ready for preview and download!`,
 
               {activeTab === 'preview' && (
                 <div className="h-full bg-gray-100 dark:bg-gray-900 flex flex-col">
-                  {generatedCode && (
-                    <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Preview Mode:</span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setPreviewMode('desktop')}
-                              className={`px-3 py-1 text-xs rounded ${
-                                previewMode === 'desktop'
-                                  ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
-                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                              }`}
-                            >
-                              Desktop
-                            </button>
-                            <button
-                              onClick={() => setPreviewMode('tablet')}
-                              className={`px-3 py-1 text-xs rounded ${
-                                previewMode === 'tablet'
-                                  ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
-                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                              }`}
-                            >
-                              Tablet
-                            </button>
-                            <button
-                              onClick={() => setPreviewMode('mobile')}
-                              className={`px-3 py-1 text-xs rounded ${
-                                previewMode === 'mobile'
-                                  ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
-                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                              }`}
-                            >
-                              Mobile
-                            </button>
-                          </div>
+                  <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Preview Mode:</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setPreviewMode('desktop')}
+                            className={`px-3 py-1 text-xs rounded ${
+                              previewMode === 'desktop'
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            Desktop
+                          </button>
+                          <button
+                            onClick={() => setPreviewMode('tablet')}
+                            className={`px-3 py-1 text-xs rounded ${
+                              previewMode === 'tablet'
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            Tablet
+                          </button>
+                          <button
+                            onClick={() => setPreviewMode('mobile')}
+                            className={`px-3 py-1 text-xs rounded ${
+                              previewMode === 'mobile'
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            Mobile
+                          </button>
                         </div>
-                        {generatedCode?.projectStructure && (
-                          <span className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded">
-                            React Project
-                          </span>
-                        )}
                       </div>
                     </div>
-                  )}
+                  </div>
 
                   <div className="flex-1 p-4">
-                    {generatedCode ? (
-                      <div className="h-full flex items-center justify-center">
-                        <div
-                          className={`bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 ${
-                            previewMode === 'desktop' ? 'w-full h-full' :
-                            previewMode === 'tablet' ? 'w-3/4 h-5/6' :
-                            'w-80 h-5/6'
-                          }`}
-                        >
-                          <div className="bg-gray-100 dark:bg-gray-800 px-4 py-2 border-b flex items-center gap-2">
-                            <div className="flex gap-2">
-                              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                            </div>
-                            <span className="text-sm text-gray-600 dark:text-gray-400 ml-4">
-                              {currentProject?.name || 'Generated Website'}
-                              <span className="ml-2 text-xs">({previewMode})</span>
-                            </span>
+                    <div className="h-full flex items-center justify-center">
+                      <div
+                        className={`bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 ${
+                          previewMode === 'desktop' ? 'w-full h-full' :
+                          previewMode === 'tablet' ? 'w-3/4 h-5/6' :
+                          'w-80 h-5/6'
+                        }`}
+                      >
+                        <div className="bg-gray-100 dark:bg-gray-800 px-4 py-2 border-b flex items-center gap-2">
+                          <div className="flex gap-2">
+                            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                           </div>
-                          <iframe
-                            srcDoc={generatedCode.projectStructure ?
-                              generateReactPreview(generatedCode.projectStructure) :
-                              generatedCode.html
-                            }
-                            className="w-full h-full border-0"
-                            sandbox="allow-scripts allow-same-origin"
-                            title="Website Preview"
-                          />
+                          <span className="text-sm text-gray-600 dark:text-gray-400 ml-4">
+                            {currentProject?.name || 'Generated Website'}
+                            <span className="ml-2 text-xs">({previewMode})</span>
+                          </span>
                         </div>
+                        <iframe
+                          srcDoc={generateBasicHTMLPreview()}
+                          className="w-full h-full border-0"
+                          sandbox="allow-scripts allow-same-origin"
+                          title="Website Preview"
+                        />
                       </div>
-                    ) : (
-                      <div className="h-full flex items-center justify-center">
-                        <div className="text-center">
-                          <Eye className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                            No preview available
-                          </h3>
-                          <p className="text-gray-600 dark:text-gray-400">
-                            Generate a website to see the preview here.
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -929,26 +531,11 @@ The project is now ready for preview and download!`,
                         <Folder size={16} />
                         Project Files
                       </h3>
-                      {generatedCode?.projectStructure ? (
-                        <FileTree
-                          projectStructure={generatedCode.projectStructure}
-                          selectedFile={selectedFile}
-                          onFileSelect={setSelectedFile}
-                        />
-                      ) : generatedCode ? (
-                        <FileTree
-                          projectStructure={{'index.html': generatedCode.html}}
-                          selectedFile={selectedFile}
-                          onFileSelect={setSelectedFile}
-                        />
-                      ) : (
-                        <div className="text-center py-8">
-                          <Folder className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                          <p className="text-gray-500 dark:text-gray-400 text-sm">
-                            Generate a project to see files
-                          </p>
-                        </div>
-                      )}
+                      <FileTree
+                        projectStructure={mockProjectFiles}
+                        selectedFile={selectedFile}
+                        onFileSelect={setSelectedFile}
+                      />
                     </div>
                   </div>
 
@@ -963,12 +550,7 @@ The project is now ready for preview and download!`,
                         <div className="flex-1 overflow-auto">
                           <pre className="p-4 text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-900 h-full font-mono leading-relaxed">
                             <code>
-                              {generatedCode?.projectStructure
-                                ? generatedCode.projectStructure[selectedFile] || 'File content not available'
-                                : selectedFile === 'index.html' && generatedCode?.html
-                                  ? generatedCode.html
-                                  : 'Select a file to view its content'
-                              }
+                              {mockProjectFiles[selectedFile] || 'File content not available'}
                             </code>
                           </pre>
                         </div>
@@ -993,8 +575,6 @@ The project is now ready for preview and download!`,
           </div>
         </div>
       </div>
-
-
 
       {/* New Project Modal */}
       {showNewProjectModal && (

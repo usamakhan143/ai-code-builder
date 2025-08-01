@@ -2,12 +2,14 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ProjectProvider } from './contexts/ProjectContext'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { BuilderProvider } from './contexts/BuilderContext'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Workspace from './pages/Workspace'
 import Editor from './pages/Editor'
 import Export from './pages/Export'
+
 
 // Protected Route component
 function ProtectedRoute({ children }) {
@@ -47,7 +49,9 @@ function App() {
                 } />
                 <Route path="/editor" element={
                   <ProtectedRoute>
-                    <Editor />
+                    <BuilderProvider>
+                      <Editor />
+                    </BuilderProvider>
                   </ProtectedRoute>
                 } />
                 <Route path="/export" element={

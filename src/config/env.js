@@ -4,7 +4,12 @@
 // Centralized configuration for all environment variables
 
 const config = {
-  // OpenAI Configuration
+  // Claude AI Configuration (Anthropic)
+  claude: {
+    apiKey: import.meta.env.VITE_CLAUDE_API_KEY,
+  },
+
+  // Legacy OpenAI Configuration (deprecated)
   openai: {
     apiKey: import.meta.env.VITE_OPENAI_API_KEY,
   },
@@ -41,7 +46,7 @@ const config = {
 // Validation function to check if required environment variables are set
 export const validateConfig = () => {
   const requiredVars = [
-    'VITE_OPENAI_API_KEY',
+    'VITE_CLAUDE_API_KEY',
     'VITE_FIREBASE_API_KEY',
     'VITE_FIREBASE_AUTH_DOMAIN',
     'VITE_FIREBASE_PROJECT_ID',
@@ -68,8 +73,12 @@ if (config.isDevelopment && config.app.debugMode) {
       projectId: config.firebase.projectId,
       authDomain: config.firebase.authDomain,
     },
+    claude: {
+      hasApiKey: !!config.claude.apiKey,
+    },
     openai: {
       hasApiKey: !!config.openai.apiKey,
+      deprecated: true,
     },
   });
 }

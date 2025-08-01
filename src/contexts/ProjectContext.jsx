@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase-clean';
+import { db, isFirebaseAvailable, handleFirebaseError } from '../config/firebase';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -47,7 +47,7 @@ export const ProjectProvider = ({ children }) => {
 
   // Check if Firestore is available
   const isFirestoreAvailable = () => {
-    return !firestoreError;
+    return isFirebaseAvailable() && !firestoreError;
   };
 
   // Create a new project
@@ -68,14 +68,24 @@ export const ProjectProvider = ({ children }) => {
 
     try {
       if (isFirestoreAvailable()) {
-        // Clean project data for Firebase
-        const cleanProject = cleanDataForFirebase(project);
-        await setDoc(doc(db, 'projects', projectId), cleanProject);
+        try {
+          // Clean project data for Firebase
+          const cleanProject = cleanDataForFirebase(project);
+          await setDoc(doc(db, 'projects', projectId), cleanProject);
+          console.log('✅ Project saved to Firestore');
+        } catch (firebaseError) {
+          console.warn('⚠️ Firebase save failed, using local storage:', firebaseError.message);
+          // Fallback to localStorage if Firebase fails
+          const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
+          localProjects.push(project);
+          localStorage.setItem('ai-builder-projects', JSON.stringify(localProjects));
+        }
       } else {
         // Fallback to localStorage
         const localProjects = JSON.parse(localStorage.getItem('ai-builder-projects') || '[]');
         localProjects.push(project);
         localStorage.setItem('ai-builder-projects', JSON.stringify(localProjects));
+        console.log('✅ Project saved to local storage');
       }
 
       setCurrentProject(project);
@@ -262,7 +272,7 @@ export const ProjectProvider = ({ children }) => {
     return newMessage;
   };
 
-  // Add project version
+  // Add project version (for future AI integration)
   const addProjectVersion = async (version) => {
     if (!currentProject) return;
 

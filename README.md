@@ -1,8 +1,8 @@
 # AI UI Builder 🚀
 
-A modern, chat-based AI website builder that generates complete websites from natural language descriptions. Built with React, Firebase, and OpenAI.
+A modern, chat-based AI website builder that generates complete websites from natural language descriptions. Built with React, Firebase, and Claude AI by Anthropic.
 
-![AI UI Builder](https://img.shields.io/badge/AI-Powered-blue?style=for-the-badge&logo=openai)
+![AI UI Builder](https://img.shields.io/badge/AI-Claude_Powered-purple?style=for-the-badge&logo=anthropic)
 ![React](https://img.shields.io/badge/React-18-blue?style=for-the-badge&logo=react)
 ![Firebase](https://img.shields.io/badge/Firebase-orange?style=for-the-badge&logo=firebase)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-38B2AC?style=for-the-badge&logo=tailwind-css)
@@ -11,8 +11,9 @@ A modern, chat-based AI website builder that generates complete websites from na
 
 ### 🤖 AI-Powered Generation
 - **Natural Language Input**: Describe your website in plain English
-- **GPT-4 Turbo Integration**: Powered by OpenAI's latest model
-- **Complete Code Generation**: HTML, CSS, and JavaScript files
+- **Claude AI Integration**: Powered by Anthropic's advanced language model
+- **Complete Code Generation**: HTML, CSS, JavaScript, React, Vue, Angular and more
+- **Multi-Technology Support**: Generates proper folder structures for various frameworks
 - **Responsive Design**: Mobile-first, modern websites
 
 ### 💬 Chat-Based Interface
@@ -74,7 +75,7 @@ This project requires several environment variables to function properly.
 **📋 [Complete Environment Setup Guide](./ENVIRONMENT_SETUP.md)**
 
 ### Quick Setup Checklist
-- [ ] OpenAI API key (required)
+- [ ] Claude API key from Anthropic (required)
 - [ ] Firebase project configuration (required)
 - [ ] Copy `.env.example` to `.env`
 - [ ] Fill in your actual values
@@ -92,7 +93,7 @@ This project requires several environment variables to function properly.
 ### Backend Services
 - **Firebase Authentication** - User management
 - **Cloud Firestore** - Project metadata storage
-- **OpenAI API** - AI-powered website generation
+- **Claude AI (Anthropic)** - AI-powered website generation with multi-technology support
 
 ### Development Tools
 - **ESLint** - Code linting
@@ -164,7 +165,7 @@ AI: I've added a blog section with:
 Set these in your hosting platform:
 
 ```env
-VITE_OPENAI_API_KEY=your_openai_key
+VITE_CLAUDE_API_KEY=your_claude_api_key
 VITE_FIREBASE_API_KEY=your_firebase_key
 VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=your-project-id
@@ -207,7 +208,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [OpenAI](https://openai.com) for GPT-4 API
+- [Anthropic](https://anthropic.com) for Claude AI API
 - [Firebase](https://firebase.google.com) for backend services
 - [Tailwind CSS](https://tailwindcss.com) for styling
 - [Lucide](https://lucide.dev) for icons
